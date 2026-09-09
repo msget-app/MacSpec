@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build universal macOS binary
+    runs-on: macos-15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Compile and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build dist
+          for arch in arm64 x86_64; do
+            xcrun swiftc -O -target "${arch}-apple-macosx11.0" \
+              MacSpec.swift -o "build/MacSpec-${arch}"
+          done
+          xcrun lipo -create build/MacSpec-arm64 build/MacSpec-x86_64 -output build/MacSpec
+          xcrun lipo build/MacSpec -verify_arch arm64
+          xcrun lipo build/MacSpec -verify_arch x86_64
+          tar -czf dist/MacSpec-macos-universal.tar.gz -C build MacSpec
+          (cd dist && shasum -a 256 MacSpec-macos-universal.tar.gz > SHA256SUMS)
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacSpec-macos-universal
+          path: dist/
+          if-no-files-found: error
