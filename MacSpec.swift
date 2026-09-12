@@ -3,6 +3,24 @@ import CryptoKit
 import Foundation
 import IOKit
 
+enum EncryptedHardwareProperty {
+    // IORegistry keys read from IOPower:/.
+    static let platformSerialNumber = "Gq3489ugfi"
+    static let platformUUID = "Fyp98tpgj"
+    static let bootUUID = "kbjfrfpoJU" // Named root_disk_uuid_enc in the protobuf.
+    static let rom = "oycqAZloTNDm"
+    static let mlb = "abKPld1EcMni"
+}
+
+enum AppleClientMetadata {
+    // Sent as the IDS x-protocol-version header, not a protobuf version.
+    static let idsProtocolVersion: Int32 = 1640
+    // Fixed client metadata; these are not the host's installed versions.
+    static let iCloudUserAgent = "com.apple.iCloudHelper/282 CFNetwork/1408.0.4 Darwin/22.5.0"
+    // Included in the X-Mme-Client-Info header.
+    static let aosKitClientInfo = "com.apple.AOSKit/282 (com.apple.accountsd/113)"
+}
+
 enum HwInfoError: Error, CustomStringConvertible {
     case missing(String)
     case serialize
@@ -183,21 +201,21 @@ func collectHwInfo() throws -> Data {
     inner.string(5, (try requireItem(chosenTree, "boot-uuid")).trimmingCharacters(in: CharacterSet(["\0"])))
     inner.string(6, boardID)
     inner.string(7, sysctl(name: "kern.osversion"))
-    inner.bytes(8, try requireData(ioPower, "Gq3489ugfi"))
-    inner.bytes(9, try requireData(ioPower, "Fyp98tpgj"))
-    inner.bytes(10, try requireData(ioPower, "kbjfrfpoJU"))
+    inner.bytes(8, try requireData(ioPower, EncryptedHardwareProperty.platformSerialNumber))
+    inner.bytes(9, try requireData(ioPower, EncryptedHardwareProperty.platformUUID))
+    inner.bytes(10, try requireData(ioPower, EncryptedHardwareProperty.bootUUID))
     inner.bytes(11, rom)
-    inner.bytes(12, try requireData(ioPower, "oycqAZloTNDm"))
+    inner.bytes(12, try requireData(ioPower, EncryptedHardwareProperty.rom))
     inner.string(13, mlb)
-    inner.bytes(14, try requireData(ioPower, "abKPld1EcMni"))
+    inner.bytes(14, try requireData(ioPower, EncryptedHardwareProperty.mlb))
 
     var outer = ProtoWriter()
     outer.message(1, inner.data)
     outer.string(2, sysctl(name: "kern.osproductversion"))
-    outer.int32(3, 1640)
+    outer.int32(3, AppleClientMetadata.idsProtocolVersion)
     outer.string(4, platformUuid)
-    outer.string(5, "com.apple.iCloudHelper/282 CFNetwork/1408.0.4 Darwin/22.5.0")
-    outer.string(6, "com.apple.AOSKit/282 (com.apple.accountsd/113)")
+    outer.string(5, AppleClientMetadata.iCloudUserAgent)
+    outer.string(6, AppleClientMetadata.aosKitClientInfo)
     return outer.data
 }
 
